@@ -1,0 +1,127 @@
+{
+  "Comment": "Content processing workflow for Kriistina Bot",
+  "StartAt": "ProcessContent",
+  "States": {
+    "ProcessContent": {
+      "Type": "Task",
+      "Resource": "${STTFunctionArn}",
+      "TimeoutSeconds": 900,
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "CheckProcessingResult"
+    },
+    
+    "CheckProcessingResult": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.error",
+          "IsPresent": true,
+          "Next": "HandleError"
+        }
+      ],
+      "Default": "GeneratePost"
+    },
+    
+    "GeneratePost": {
+      "Type": "Task",
+      "Resource": "${GeneratorFunctionArn}",
+      "TimeoutSeconds": 900,
+      "Retry": [
+        {
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.AWSLambdaException", "Lambda.SdkClientException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        },
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "HandleError",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "CheckGenerationResult"
+    },
+    
+    "CheckGenerationResult": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.error",
+          "IsPresent": true,
+          "Next": "HandleError"
+        }
+      ],
+      "Default": "SendToQueue"
+    },
+    
+    "SendToQueue": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${ResultQueueUrl}",
+        "MessageBody.$": "$"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["SQS.SdkClientException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "Success"
+    },
+    
+    "HandleError": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage",
+      "Parameters": {
+        "QueueUrl": "${ResultQueueUrl}",
+        "MessageBody": {
+          "chat_id.$": "$.chat_id",
+          "user_id.$": "$.user_id",
+          "error_message.$": "$.error.Cause"
+        }
+      },
+      "Next": "Fail"
+    },
+    
+    "Success": {
+      "Type": "Succeed"
+    },
+    
+    "Fail": {
+      "Type": "Fail",
+      "Error": "ProcessingFailed",
+      "Cause": "Content processing workflow failed"
+    }
+  }
+} 

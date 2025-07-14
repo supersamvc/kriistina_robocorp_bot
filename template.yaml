@@ -1,0 +1,191 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: Kriistina Robocorp Bot - Content Style AI
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+  TelegramBotToken:
+    Type: String
+    Default: YOUR_TELEGRAM_BOT_TOKEN_HERE
+    NoEcho: true
+  OpenAIAPIKey:
+    Type: String
+    Default: YOUR_OPENAI_API_KEY_HERE
+    NoEcho: true
+  SupabaseURL:
+    Type: String
+    Default: YOUR_SUPABASE_URL_HERE
+  SupabaseAPIKey:
+    Type: String
+    Default: YOUR_SUPABASE_API_KEY_HERE
+    NoEcho: true
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 300
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        TELEGRAM_BOT_TOKEN: !Ref TelegramBotToken
+        OPENAI_API_KEY: !Ref OpenAIAPIKey
+        SUPABASE_URL: !Ref SupabaseURL
+        SUPABASE_API_KEY: !Ref SupabaseAPIKey
+        CONTENT_BUCKET_NAME: !Ref ContentBucket
+
+Resources:
+  # API Gateway для Telegram webhook
+  TelegramAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'*'"
+        AllowHeaders: "'*'"
+        AllowOrigin: "'*'"
+
+  # Lambda функция для приема webhook от Telegram
+  WebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/webhook/
+      Handler: app.lambda_handler
+      MemorySize: 512
+      Environment:
+        Variables:
+          PROCESSING_STATE_MACHINE_ARN: !Ref ProcessingStateMachine
+      Events:
+        TelegramWebhook:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TelegramAPI
+            Path: /webhook/{token}
+            Method: post
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - states:StartExecution
+                - s3:PutObject
+                - s3:GetObject
+                - secretsmanager:GetSecretValue
+              Resource: '*'
+
+  # Lambda функция для отправки сообщений в Telegram
+  SenderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/sender/
+      Handler: app.lambda_handler
+      MemorySize: 256
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ResultQueue.Arn
+            BatchSize: 1
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - secretsmanager:GetSecretValue
+              Resource: '*'
+
+  # Lambda функция для STT обработки
+  STTFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/stt/
+      Handler: app.lambda_handler
+      MemorySize: 1024
+      Timeout: 900
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+                - s3:PutObject
+                - secretsmanager:GetSecretValue
+              Resource: '*'
+
+  # Lambda функция для генерации постов
+  GeneratorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/lambda/generator/
+      Handler: app.lambda_handler
+      MemorySize: 1024
+      Timeout: 900
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: '*'
+
+  # S3 bucket для временного хранения аудио и контента
+  ContentBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AWS::StackName}-content-${Environment}"
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 1
+            Id: DeleteAfter24Hours
+
+  # SQS очередь для результатов
+  ResultQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-results-${Environment}"
+      VisibilityTimeout: 300
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  # DLQ для failed сообщений
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${AWS::StackName}-dlq-${Environment}"
+
+  # Step Functions State Machine
+  ProcessingStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: src/stepfunctions/process_content.json
+      DefinitionSubstitutions:
+        STTFunctionArn: !GetAtt STTFunction.Arn
+        GeneratorFunctionArn: !GetAtt GeneratorFunction.Arn
+        ResultQueueUrl: !Ref ResultQueue
+        ContentBucketName: !Ref ContentBucket
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - lambda:InvokeFunction
+                - sqs:SendMessage
+                - s3:GetObject
+                - s3:PutObject
+              Resource: '*'
+
+Outputs:
+  WebhookURL:
+    Description: "Telegram Webhook URL"
+    Value: !Sub "https://${TelegramAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook"
+  
+  ContentBucket:
+    Description: "S3 Bucket for content storage"
+    Value: !Ref ContentBucket 

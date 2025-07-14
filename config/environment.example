@@ -1,0 +1,17 @@
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ
+
+# OpenAI API Configuration
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Supabase Configuration
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+# AWS Configuration (for SAM deployment)
+AWS_REGION=us-east-1
+CONTENT_BUCKET_NAME=kriistina-content-bucket
+
+# Mini Web App Configuration (for React .env file)
+REACT_APP_SUPABASE_URL=https://your-project.supabase.co
+REACT_APP_SUPABASE_ANON_KEY=your-anon-key-here 

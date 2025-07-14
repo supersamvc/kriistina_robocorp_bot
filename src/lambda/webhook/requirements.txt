@@ -1,0 +1,5 @@
+boto3>=1.34.0
+requests>=2.31.0
+fastapi>=0.104.0
+mangum>=0.17.0
+supabase>=2.3.0 
