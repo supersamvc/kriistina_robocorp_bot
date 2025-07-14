@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState } from 'react';
 import './StyleEditor.css';
 
 interface UserStyle {
@@ -40,10 +40,7 @@ const StyleEditor: React.FC<StyleEditorProps> = ({ style, onChange, saving }) =>
     handleStyleChange(type, words);
   };
 
-  const handleExamplesChange = (value: string) => {
-    const examples = value.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    handleStyleChange('examples', examples);
-  };
+
 
   const addExample = () => {
     const newExample = prompt('Введите пример поста:');

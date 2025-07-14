@@ -27,6 +27,18 @@
   color: var(--tg-theme-hint-color, #666666);
 }
 
+.demo-banner {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
 .app-main {
   padding: 0;
   max-width: 100%;
@@ -90,6 +102,42 @@
   opacity: 0.8;
 }
 
+/* Секция сохранения */
+.save-section {
+  padding: 20px 16px;
+  border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+  background: var(--tg-theme-secondary-bg-color, #f8f9fa);
+  position: sticky;
+  bottom: 0;
+}
+
+.save-button {
+  width: 100%;
+  padding: 16px;
+  background: var(--tg-theme-button-color, #0088cc);
+  color: var(--tg-theme-button-text-color, #ffffff);
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.3);
+}
+
+.save-button:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 136, 204, 0.4);
+}
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 136, 204, 0.2);
+}
+
 /* Отзывчивость */
 @media (max-width: 480px) {
   .app-header {
@@ -102,5 +150,14 @@
   
   .user-info {
     font-size: 12px;
+  }
+
+  .save-section {
+    padding: 16px 12px;
+  }
+
+  .save-button {
+    font-size: 16px;
+    padding: 14px;
   }
 } 
